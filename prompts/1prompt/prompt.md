@@ -1,0 +1,1 @@
+create a file called hi.txt in this directory and write hello inside.
