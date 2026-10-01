@@ -62,12 +62,13 @@ SCHEDULE_FILE = "schedule.json"
 
 def fetch_scoreboard(sport, league, date_str, retries=3):
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date_str}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    req = urllib.request.Request(url, headers=headers)
+    user_agents = ["curl/8.0", "Mozilla/5.0"]
     
     for attempt in range(retries):
+        headers = {
+            "User-Agent": user_agents[attempt % len(user_agents)]
+        }
+        req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status == 200:

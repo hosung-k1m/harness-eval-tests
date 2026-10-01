@@ -3,10 +3,62 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
-if ! command -v python3 >/dev/null 2>&1; then
-    echo "Error: python3 is required to run the validator." >&2
-    exit 1
-fi
+ensure_dependencies() {
+    # Check if python3 and required standard modules/certificates are functional
+    if command -v python3 >/dev/null 2>&1; then
+        if python3 -c "import urllib.request, urllib.error, json, ssl; ssl.create_default_context().load_default_certs()" >/dev/null 2>&1; then
+            if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+                if python3 -m pip --version >/dev/null 2>&1; then
+                    python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages 2>/dev/null || python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" >/dev/null 2>&1 || true
+                fi
+            fi
+            return 0
+        fi
+    fi
+
+    echo "Installing required dependencies for validator..." >&2
+
+    local SUDO=""
+    if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+        SUDO="sudo"
+    fi
+
+    if command -v apt-get >/dev/null 2>&1; then
+        export DEBIAN_FRONTEND=noninteractive
+        $SUDO apt-get update -y -q >/dev/null
+        $SUDO apt-get install -y -q --no-install-recommends python3 ca-certificates curl >/dev/null
+        $SUDO apt-get install -y -q --no-install-recommends python3-pip >/dev/null 2>&1 || true
+    elif command -v apk >/dev/null 2>&1; then
+        $SUDO apk update >/dev/null
+        $SUDO apk add --no-cache python3 ca-certificates curl py3-pip >/dev/null 2>&1 || true
+    elif command -v dnf >/dev/null 2>&1; then
+        $SUDO dnf install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+    elif command -v yum >/dev/null 2>&1; then
+        $SUDO yum install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+    elif command -v pacman >/dev/null 2>&1; then
+        $SUDO pacman -Sy --noconfirm python ca-certificates curl python-pip >/dev/null 2>&1 || true
+    elif command -v zypper >/dev/null 2>&1; then
+        $SUDO zypper --non-interactive install python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+    elif command -v brew >/dev/null 2>&1; then
+        brew install python3 ca-certificates curl >/dev/null 2>&1 || true
+    else
+        echo "Warning: No supported package manager found to install dependencies automatically." >&2
+    fi
+
+    if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
+        if python3 -m pip --version >/dev/null 2>&1; then
+            python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages 2>/dev/null || python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" >/dev/null 2>&1 || true
+        fi
+    fi
+
+    if ! command -v python3 >/dev/null 2>&1; then
+        echo "Error: python3 is required to run the validator and could not be installed." >&2
+        exit 1
+    fi
+}
+
+ensure_dependencies
+
 
 if [ -f "$SCRIPT_DIR/validate.py" ]; then
     exec python3 "$SCRIPT_DIR/validate.py"
@@ -77,12 +129,13 @@ SCHEDULE_FILE = "schedule.json"
 
 def fetch_scoreboard(sport, league, date_str, retries=3):
     url = f"https://site.api.espn.com/apis/site/v2/sports/{sport}/{league}/scoreboard?dates={date_str}"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    req = urllib.request.Request(url, headers=headers)
+    user_agents = ["curl/8.0", "Mozilla/5.0"]
     
     for attempt in range(retries):
+        headers = {
+            "User-Agent": user_agents[attempt % len(user_agents)]
+        }
+        req = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=10) as resp:
                 if resp.status == 200:
