@@ -6,13 +6,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 ensure_dependencies() {
     # Check if python3 and required standard modules/certificates are functional
     if command -v python3 >/dev/null 2>&1; then
-        if python3 -c "import urllib.request, urllib.error, json, ssl; ssl.create_default_context().load_default_certs()" >/dev/null 2>&1; then
+        if python3 -c "import urllib.request, urllib.error, json, ssl, datetime; ssl.create_default_context().load_default_certs()" >/dev/null 2>&1; then
             if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
                 if python3 -m pip --version >/dev/null 2>&1; then
                     python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages 2>/dev/null || python3 -m pip install -r "$SCRIPT_DIR/requirements.txt" >/dev/null 2>&1 || true
+                    return 0
                 fi
+            else
+                return 0
             fi
-            return 0
         fi
     fi
 
@@ -26,19 +28,30 @@ ensure_dependencies() {
     if command -v apt-get >/dev/null 2>&1; then
         export DEBIAN_FRONTEND=noninteractive
         $SUDO apt-get update -y -q >/dev/null
-        $SUDO apt-get install -y -q --no-install-recommends python3 ca-certificates curl >/dev/null
-        $SUDO apt-get install -y -q --no-install-recommends python3-pip >/dev/null 2>&1 || true
+        $SUDO apt-get install -y -q --no-install-recommends python3 ca-certificates curl python3-pip >/dev/null 2>&1 || \
+        $SUDO apt-get install -y -q --no-install-recommends python3 ca-certificates curl >/dev/null 2>&1 || true
+        if command -v update-ca-certificates >/dev/null 2>&1; then
+            $SUDO update-ca-certificates >/dev/null 2>&1 || true
+        fi
     elif command -v apk >/dev/null 2>&1; then
         $SUDO apk update >/dev/null
-        $SUDO apk add --no-cache python3 ca-certificates curl py3-pip >/dev/null 2>&1 || true
+        $SUDO apk add --no-cache python3 ca-certificates curl py3-pip >/dev/null 2>&1 || \
+        $SUDO apk add --no-cache python3 ca-certificates curl >/dev/null 2>&1 || true
+        if command -v update-ca-certificates >/dev/null 2>&1; then
+            $SUDO update-ca-certificates >/dev/null 2>&1 || true
+        fi
     elif command -v dnf >/dev/null 2>&1; then
-        $SUDO dnf install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+        $SUDO dnf install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || \
+        $SUDO dnf install -y python3 ca-certificates curl >/dev/null 2>&1 || true
     elif command -v yum >/dev/null 2>&1; then
-        $SUDO yum install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+        $SUDO yum install -y python3 ca-certificates curl python3-pip >/dev/null 2>&1 || \
+        $SUDO yum install -y python3 ca-certificates curl >/dev/null 2>&1 || true
     elif command -v pacman >/dev/null 2>&1; then
-        $SUDO pacman -Sy --noconfirm python ca-certificates curl python-pip >/dev/null 2>&1 || true
+        $SUDO pacman -Sy --noconfirm python ca-certificates curl python-pip >/dev/null 2>&1 || \
+        $SUDO pacman -Sy --noconfirm python ca-certificates curl >/dev/null 2>&1 || true
     elif command -v zypper >/dev/null 2>&1; then
-        $SUDO zypper --non-interactive install python3 ca-certificates curl python3-pip >/dev/null 2>&1 || true
+        $SUDO zypper --non-interactive install python3 ca-certificates curl python3-pip >/dev/null 2>&1 || \
+        $SUDO zypper --non-interactive install python3 ca-certificates curl >/dev/null 2>&1 || true
     elif command -v brew >/dev/null 2>&1; then
         brew install python3 ca-certificates curl >/dev/null 2>&1 || true
     else
